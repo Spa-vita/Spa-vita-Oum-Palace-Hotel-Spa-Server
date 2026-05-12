@@ -7,12 +7,18 @@ export function configureApp(app: INestApplication): void {
     (app as NestExpressApplication).set('trust proxy', 1);
   }
   app.use(helmet());
-  const frontend = process.env.FRONTEND_ORIGIN;
-  app.enableCors(
-    frontend
-      ? { origin: frontend.split(',').map((o) => o.trim()), credentials: true }
-      : { origin: true, credentials: true },
-  );
+  const deployedFrontend =
+    'http://s88so40wkksskw8gcwggcokk.76.13.38.80.sslip.io';
+  const fromEnv =
+    process.env.FRONTEND_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) ??
+    [];
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd && fromEnv.length === 0) {
+    app.enableCors({ origin: true, credentials: true });
+  } else {
+    const origins = [...new Set([deployedFrontend, ...fromEnv])];
+    app.enableCors({ origin: origins, credentials: true });
+  }
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
