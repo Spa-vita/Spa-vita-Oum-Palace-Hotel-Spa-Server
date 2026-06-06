@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
   Param,
   Patch,
   Post,
@@ -14,11 +17,17 @@ import { ReservationsService } from './reservations.service';
 
 @Controller('reservations')
 export class ReservationsController {
+  private readonly logger = new Logger(ReservationsController.name);
+
   constructor(private readonly reservations: ReservationsService) {}
 
   /** Public: création d'une réservation depuis le site */
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateReservationDto) {
+    this.logger.log(
+      `POST /reservations — guest=${dto.guest.email}, room=${dto.summary.roomId}, type=${dto.type}`,
+    );
     return this.reservations.create(dto);
   }
 
@@ -26,8 +35,9 @@ export class ReservationsController {
   @Get()
   @UseGuards(AuthGuard('jwt-admin'))
   async list() {
+    this.logger.log('GET /reservations — admin list');
     const items = await this.reservations.list();
-    // Le front accepte soit tableau direct, soit { items }
+    this.logger.log(`GET /reservations — ${items.length} réservation(s)`);
     return { items };
   }
 
@@ -38,6 +48,7 @@ export class ReservationsController {
     @Param('id') id: string,
     @Body() dto: UpdateReservationStatusDto,
   ) {
+    this.logger.log(`PATCH /reservations/${id} — status=${dto.status}`);
     const item = await this.reservations.updateStatus(id, dto.status);
     return { item };
   }

@@ -1,17 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 
 type ReservationStatus = 'pending' | 'confirmed' | 'cancelled';
+type ReservationType = 'rooms' | 'spa' | 'restaurant';
 
 interface ReservationRow {
   id: string;
   reference: string;
   status: ReservationStatus;
+  type: ReservationType;
   created_at: string;
   source: string | null;
   locale: string | null;
+  summary: unknown;
+  guest: unknown;
+}
+
+export interface ReservationRecord {
+  id: string;
+  reference: string;
+  status: ReservationStatus;
+  type: ReservationType;
+  createdAt: string;
   summary: unknown;
   guest: unknown;
 }
@@ -26,105 +43,105 @@ function makeReference(now = new Date()): string {
   return `OPH-${year}-${seq}`;
 }
 
+function mapRow(row: ReservationRow): ReservationRecord {
+  return {
+    id: row.id,
+    reference: row.reference,
+    status: row.status,
+    type: row.type,
+    createdAt: row.created_at,
+    summary: row.summary,
+    guest: row.guest,
+  };
+}
+
 @Injectable()
 export class ReservationsService {
+  private readonly logger = new Logger(ReservationsService.name);
+
   constructor(private readonly supabase: SupabaseService) {}
 
-  async create(
-    dto: CreateReservationDto,
-  ): Promise<{ id: string; reference: string }> {
-    // محاولة توليد مرجع فريد (قد يحدث تصادم نادر جداً)
+  async create(dto: CreateReservationDto): Promise<ReservationRecord> {
+    this.logger.debug(
+      `create() — from=${dto.summary.fromISO} to=${dto.summary.toISO}`,
+    );
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const reference = makeReference();
+      this.logger.debug(`create() — tentative ${attempt + 1}, ref=${reference}`);
       const { data, error } = await this.supabase
         .getClient()
         .from('reservations')
         .insert({
           reference,
           status: 'pending',
+          type: dto.type,
           source: dto.source ?? 'web',
           locale: dto.locale ?? null,
           summary: dto.summary,
           guest: dto.guest,
         } as never)
-        .select('id, reference')
+        .select('id, reference, status, type, created_at, summary, guest')
         .single();
 
       if (!error) {
-        return {
-          id: (data as { id: string; reference: string }).id,
-          reference: (data as { id: string; reference: string }).reference,
-        };
+        const row = mapRow(data as ReservationRow);
+        this.logger.log(`create() OK — id=${row.id} ref=${row.reference}`);
+        return row;
       }
 
-      // Violation unique (reference) → retry
       const msg = error.message?.toLowerCase?.() ?? '';
+      this.logger.error(`create() Supabase error: ${error.message}`);
       if (msg.includes('duplicate') || msg.includes('unique')) {
         continue;
       }
-      throw new Error(error.message);
+      throw new InternalServerErrorException(error.message);
     }
-    throw new Error('Unable to generate a unique reservation reference');
+    throw new InternalServerErrorException(
+      'Unable to generate a unique reservation reference',
+    );
   }
 
-  async list(): Promise<
-    Array<{
-      id: string;
-      reference: string;
-      status: ReservationStatus;
-      createdAt: string;
-      summary: unknown;
-      guest: unknown;
-    }>
-  > {
+  async list(): Promise<ReservationRecord[]> {
+    this.logger.debug('list() — lecture Supabase');
     const { data, error } = await this.supabase
       .getClient()
       .from('reservations')
-      .select('id, reference, status, created_at, summary, guest')
+      .select('id, reference, status, type, created_at, summary, guest')
       .order('created_at', { ascending: false });
     if (error) {
-      throw new Error(error.message);
+      this.logger.error(`list() Supabase error: ${error.message}`);
+      throw new InternalServerErrorException(error.message);
     }
     const rows = (data ?? []) as ReservationRow[];
-    return rows.map((r) => ({
-      id: r.id,
-      reference: r.reference,
-      status: r.status,
-      createdAt: r.created_at,
-      summary: r.summary,
-      guest: r.guest,
-    }));
+    this.logger.log(`list() OK — ${rows.length} ligne(s)`);
+    return rows.map(mapRow);
   }
 
   async updateStatus(
     id: string,
     status: ReservationStatus,
-  ): Promise<{
-    id: string;
-    reference: string;
-    status: ReservationStatus;
-    createdAt: string;
-    summary: unknown;
-    guest: unknown;
-  }> {
+  ): Promise<ReservationRecord> {
+    this.logger.debug(`updateStatus() — id=${id} status=${status}`);
     const { data, error } = await this.supabase
       .getClient()
       .from('reservations')
       .update({ status } as never)
       .eq('id', id)
-      .select('id, reference, status, created_at, summary, guest')
+      .select('id, reference, status, type, created_at, summary, guest')
       .single();
     if (error) {
-      throw new Error(error.message);
+      const msg = error.message?.toLowerCase?.() ?? '';
+      if (msg.includes('0 rows') || msg.includes('no rows')) {
+        throw new NotFoundException('Reservation not found');
+      }
+      throw new InternalServerErrorException(error.message);
     }
-    const row = data as ReservationRow;
-    return {
-      id: row.id,
-      reference: row.reference,
-      status: row.status,
-      createdAt: row.created_at,
-      summary: row.summary,
-      guest: row.guest,
-    };
+    if (!data) {
+      this.logger.warn(`updateStatus() — réservation introuvable id=${id}`);
+      throw new NotFoundException('Reservation not found');
+    }
+    const row = mapRow(data as ReservationRow);
+    this.logger.log(`updateStatus() OK — ref=${row.reference} status=${row.status}`);
+    return row;
   }
 }

@@ -34,14 +34,27 @@ $ npm install
 ## Compile and run the project
 
 ```bash
-# development
+# development (default backend port 3001)
 $ npm run start
 
-# watch mode
+# watch mode (default backend port 3001)
 $ npm run start:dev
 
 # production mode
 $ npm run start:prod
+```
+
+If you need to run on a custom port, set `PORT` before start:
+
+```bash
+# run backend on port 3001 explicitly
+$ PORT=3001 npm run start:dev
+```
+
+For the frontend proxy, make sure `.env.local` contains:
+
+```env
+API_BASE_URL=http://localhost:3001
 ```
 
 ## Run tests

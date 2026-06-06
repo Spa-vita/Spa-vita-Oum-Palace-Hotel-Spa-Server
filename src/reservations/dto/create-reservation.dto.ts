@@ -1,4 +1,5 @@
 import {
+  ArrayMinSize,
   IsArray,
   IsEmail,
   IsIn,
@@ -6,14 +7,49 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  Matches,
   Min,
+  Validate,
   ValidateNested,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export const ALLOWED_ROOM_IDS = [
+  'single-deluxe',
+  'deluxe',
+  'premium',
+  'superior',
+  'twin',
+  'executive-suite',
+  'presidential',
+] as const;
+
+export const ALLOWED_EXTRAS_IDS = [
+  'breakfast',
+  'parking',
+  'airport',
+  'spa',
+] as const;
+
+@ValidatorConstraint({ name: 'isAfterDate', async: false })
+class IsAfterDateConstraint implements ValidatorConstraintInterface {
+  validate(toISO: unknown, args?: ValidationArguments): boolean {
+    const fromISO = (args?.object as ReservationSummaryDto | undefined)?.fromISO;
+    if (!fromISO || typeof toISO !== 'string' || !toISO) return false;
+    return new Date(toISO) > new Date(fromISO);
+  }
+
+  defaultMessage() {
+    return 'toISO must be after fromISO';
+  }
+}
+
 class ReservationRoomDto {
   @IsInt()
-  @Min(0)
+  @Min(1)
   adults: number;
 
   @IsInt()
@@ -29,33 +65,39 @@ class ReservationSummaryDto {
   fromISO: string;
 
   @IsISO8601()
+  @Validate(IsAfterDateConstraint)
   toISO: string;
 
   @IsInt()
-  @Min(0)
+  @Min(1)
   nights: number;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ReservationRoomDto)
   rooms: ReservationRoomDto[];
 
   @IsInt()
-  @Min(0)
+  @Min(1)
   guestsTotal: number;
 
-  @IsString()
+  @IsIn(ALLOWED_ROOM_IDS)
   roomId: string;
 
   @IsString()
   roomTitleKey: string;
+
+  @IsOptional()
+  @IsString()
+  roomImage?: string;
 
   @IsInt()
   @Min(0)
   roomPriceFromMAD: number;
 
   @IsArray()
-  @IsString({ each: true })
+  @IsIn(ALLOWED_EXTRAS_IDS, { each: true })
   extrasIds: string[];
 
   @IsInt()
@@ -81,7 +123,9 @@ class ReservationGuestDto {
   @IsEmail()
   email: string;
 
-  @IsString()
+  @Matches(/^\+[1-9]\d{7,14}$/, {
+    message: 'phone must be a valid international number (e.g. +212600000000)',
+  })
   phone: string;
 
   @IsOptional()
@@ -97,6 +141,9 @@ export class CreateReservationDto {
   @ValidateNested()
   @Type(() => ReservationGuestDto)
   guest: ReservationGuestDto;
+
+  @IsIn(['rooms', 'spa', 'restaurant'])
+  type: 'rooms' | 'spa' | 'restaurant';
 
   @IsOptional()
   @IsIn(['web'])
