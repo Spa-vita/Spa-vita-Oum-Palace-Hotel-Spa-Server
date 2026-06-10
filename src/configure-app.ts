@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import type { NextFunction, Request, Response } from 'express';
@@ -41,6 +41,15 @@ export function configureApp(app: INestApplication): void {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) => {
+        console.error('[ValidationPipe] rejected:', JSON.stringify(errors, null, 2));
+        const messages = errors.flatMap((e) =>
+          e.constraints
+            ? Object.values(e.constraints)
+            : [`${e.property} failed validation`],
+        );
+        return new BadRequestException(messages);
+      },
     }),
   );
 }

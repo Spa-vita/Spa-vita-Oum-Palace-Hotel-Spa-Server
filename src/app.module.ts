@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
+import { PaymentModule } from './payment/payment.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { SupabaseModule } from './supabase/supabase.module';
 
@@ -29,6 +30,7 @@ import { SupabaseModule } from './supabase/supabase.module';
     AdminUsersModule,
     AuthModule,
     HealthModule,
+    PaymentModule,
     ReservationsModule,
   ],
   controllers: [AppController],
