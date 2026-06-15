@@ -138,12 +138,20 @@ export class PaymentService {
   ): Record<string, string> {
     const oid = params.oid ?? params.OID;
     const procReturn = params.ProcReturnCode ?? params.procReturnCode;
+    const amount = params.amount ?? params.Amount;
+    const transId = params.TransId ?? params.transId ?? params.transid;
     const safe: Record<string, string> = {};
     if (oid) {
       safe.oid = oid;
     }
     if (procReturn) {
       safe.ProcReturnCode = procReturn;
+    }
+    if (amount) {
+      safe.amount = amount;
+    }
+    if (transId) {
+      safe.TransId = transId;
     }
     return safe;
   }
