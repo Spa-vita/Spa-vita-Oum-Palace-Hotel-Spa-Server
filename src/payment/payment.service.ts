@@ -159,8 +159,16 @@ export class PaymentService {
   private assertValidCmiHash(params: Record<string, string>): void {
     const storeKey = this.requireStoreKey();
     const oid = params.oid ?? params.OID ?? '';
+    const received = params.HASH ?? '';
+    const computed = generateCmiHash(params, storeKey);
 
-    if (!verifyCmiHash(params, storeKey)) {
+    if (computed !== received) {
+      const sortedKeys = Object.keys(params)
+        .filter((k) => k !== 'HASH' && k !== 'encoding')
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      this.logger.debug(
+        `CMI hash mismatch — oid=${oid} sortedKeys=[${sortedKeys.join(', ')}] computed=${computed} received=${received}`,
+      );
       this.logger.warn(`invalid CMI signature — oid=${oid}`);
       throw new BadRequestException('Invalid payment signature');
     }
