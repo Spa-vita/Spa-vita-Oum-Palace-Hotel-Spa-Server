@@ -67,6 +67,7 @@ export class PaymentService {
       hashAlgorithm: 'ver3',
       encoding: 'UTF-8',
       refreshtime: '5',
+      storekey: storeKey,
     };
 
     fields.HASH = generateCmiHash(fields, storeKey);
