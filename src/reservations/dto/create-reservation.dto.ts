@@ -19,12 +19,14 @@ import { Type } from 'class-transformer';
 
 export const ALLOWED_ROOM_IDS = [
   'single-deluxe',
-  'deluxe',
-  'premium',
-  'superior',
-  'twin',
   'executive-suite',
+  'executive-terrace',
+  'deluxe',
+  'deluxe-prestige',
+  'superior',
+  'superior-vue',
   'presidential',
+  'presidential-panoramic',
 ] as const;
 
 export const ALLOWED_EXTRAS_IDS = [
