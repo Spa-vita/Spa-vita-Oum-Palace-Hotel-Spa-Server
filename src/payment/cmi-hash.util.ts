@@ -44,7 +44,7 @@ export function generateCmiHash(
 ): string {
   const sortedKeys = Object.keys(params)
     .filter((k) => k !== 'HASH' && k !== 'encoding' && k !== 'storekey')
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
   let hashval = '';
   for (const key of sortedKeys) {

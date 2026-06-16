@@ -170,7 +170,7 @@ export class PaymentService {
     if (computed !== received) {
       const sortedKeys = Object.keys(params)
         .filter((k) => k !== 'HASH' && k !== 'encoding')
-        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
       this.logger.debug(
         `CMI hash mismatch — oid=${oid} sortedKeys=[${sortedKeys.join(', ')}] computed=${computed} received=${received}`,
       );
