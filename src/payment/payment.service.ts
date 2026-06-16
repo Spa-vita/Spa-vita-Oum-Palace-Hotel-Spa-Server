@@ -73,6 +73,9 @@ export class PaymentService {
     fields.HASH = generateCmiHash(fields, storeKey);
 
     this.logger.log(`initiate() — oid=${dto.orderId} amount=${amount}`);
+    this.logger.log(
+      `initiate() — sending to CMI: ${JSON.stringify({ ...fields, storekey: '[REDACTED]' })}`,
+    );
 
     return { paymentUrl, fields };
   }

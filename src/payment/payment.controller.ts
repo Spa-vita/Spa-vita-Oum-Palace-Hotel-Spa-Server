@@ -29,6 +29,7 @@ export class PaymentController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   initiate(@Body() dto: InitiatePaymentDto) {
     this.logger.debug(`initiate() — oid=${dto.orderId}`);
+    this.logger.log(`POST /payments/cmi/initiate — body: ${JSON.stringify(dto)}`);
     this.logger.log(`POST /payments/cmi/initiate — orderId=${dto.orderId}`);
     return this.payment.initiate(dto);
   }
