@@ -71,6 +71,7 @@ export class PaymentService {
     };
 
     fields.HASH = generateCmiHash(fields, storeKey);
+    delete fields.storekey;
 
     this.logger.log(`initiate() — oid=${dto.orderId} amount=${amount}`);
     this.logger.log(
