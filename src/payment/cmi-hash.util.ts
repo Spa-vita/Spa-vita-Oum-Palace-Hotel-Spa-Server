@@ -48,7 +48,7 @@ export function generateCmiHash(
 
   let hashval = '';
   for (const key of sortedKeys) {
-    hashval += `${params[key]}|`;
+    hashval += `${params[key].trim()}|`;
   }
   hashval += storeKey;
 
@@ -73,7 +73,7 @@ export function toStringParams(
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(body)) {
     if (value !== undefined && value !== null) {
-      out[key] = String(value);
+      out[key] = String(value).trim();
     }
   }
   return out;
