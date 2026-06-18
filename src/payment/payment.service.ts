@@ -80,7 +80,7 @@ export class PaymentService {
 
     return { paymentUrl, fields };
   }
-
+  
   async handleCallback(body: Record<string, unknown>): Promise<string> {
     const params = toStringParams(body);
     const oid = params.oid ?? params.OID ?? '';
@@ -184,6 +184,7 @@ export class PaymentService {
     if (!key) {
       throw new BadRequestException('Payment gateway is not configured');
     }
+    this.logger.debug(`requireStoreKey() — key length: ${key.length}`);
     return key;
   }
 
