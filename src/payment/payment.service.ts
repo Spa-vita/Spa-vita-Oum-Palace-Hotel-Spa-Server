@@ -10,7 +10,6 @@ import {
   generateCmiHash,
   redactCmiParamsForLog,
   toStringParams,
-  verifyCmiHash,
 } from './cmi-hash.util';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 
@@ -74,9 +73,6 @@ export class PaymentService {
     delete fields.storekey;
 
     this.logger.log(`initiate() — oid=${dto.orderId} amount=${amount}`);
-    this.logger.log(
-      `initiate() — sending to CMI: ${JSON.stringify({ ...fields, storekey: '[REDACTED]' })}`,
-    );
 
     return { paymentUrl, fields };
   }
@@ -184,7 +180,6 @@ export class PaymentService {
     if (!key) {
       throw new BadRequestException('Payment gateway is not configured');
     }
-    this.logger.debug(`requireStoreKey() — key length: ${key.length}`);
     return key;
   }
 
