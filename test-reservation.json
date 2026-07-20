@@ -13,11 +13,11 @@
     "guestsTotal": 3,
     "roomId": "deluxe",
     "roomTitleKey": "Deluxe Room",
-    "roomPriceFromMAD": 1200,
-    "extrasIds": ["breakfast", "spa"],
-    "roomSubtotalMAD": 2400,
-    "extrasTotalMAD": 600,
-    "estimatedTotalMAD": 3000
+    "roomPriceFromMAD": 1400,
+    "extrasIds": ["spa"],
+    "roomSubtotalMAD": 2800,
+    "extrasTotalMAD": 0,
+    "estimatedTotalMAD": 2800
   },
   "guest": {
     "firstName": "Ahmed",
