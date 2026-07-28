@@ -8,8 +8,11 @@ import { randomInt } from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 
-type ReservationStatus = 'pending' | 'confirmed' | 'cancelled';
+type ReservationStatus = 'pending' | 'paid' | 'confirmed' | 'cancelled';
 type ReservationType = 'rooms' | 'spa' | 'restaurant';
+
+/** Statuts visibles dans le dashboard admin (réservations payées ou confirmées). */
+const DASHBOARD_STATUSES: ReservationStatus[] = ['paid', 'confirmed'];
 
 interface ReservationRow {
   id: string;
@@ -101,13 +104,24 @@ export class ReservationsService {
     );
   }
 
-  async list(): Promise<ReservationRecord[]> {
-    this.logger.debug('list() — lecture Supabase');
-    const { data, error } = await this.supabase
+  /**
+   * @param includeUnpaid — si false (défaut), exclut les réservations non payées (pending).
+   */
+  async list(includeUnpaid = false): Promise<ReservationRecord[]> {
+    this.logger.debug(
+      `list() — lecture Supabase (includeUnpaid=${includeUnpaid})`,
+    );
+    let query = this.supabase
       .getClient()
       .from('reservations')
       .select('id, reference, status, type, created_at, summary, guest')
       .order('created_at', { ascending: false });
+
+    if (!includeUnpaid) {
+      query = query.in('status', DASHBOARD_STATUSES);
+    }
+
+    const { data, error } = await query;
     if (error) {
       this.logger.error(`list() Supabase error: ${error.message}`);
       throw new InternalServerErrorException(error.message);

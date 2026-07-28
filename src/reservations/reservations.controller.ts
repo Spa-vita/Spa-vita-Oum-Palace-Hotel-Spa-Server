@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -31,12 +32,15 @@ export class ReservationsController {
     return this.reservations.create(dto);
   }
 
-  /** Admin: listing des réservations */
+  /** Admin: listing des réservations payées (passer ?all=true pour tout voir) */
   @Get()
   @UseGuards(AuthGuard('jwt-admin'))
-  async list() {
-    this.logger.log('GET /reservations — admin list');
-    const items = await this.reservations.list();
+  async list(@Query('all') all?: string) {
+    const includeUnpaid = all === 'true';
+    this.logger.log(
+      `GET /reservations — admin list (includeUnpaid=${includeUnpaid})`,
+    );
+    const items = await this.reservations.list(includeUnpaid);
     this.logger.log(`GET /reservations — ${items.length} réservation(s)`);
     return { items };
   }
