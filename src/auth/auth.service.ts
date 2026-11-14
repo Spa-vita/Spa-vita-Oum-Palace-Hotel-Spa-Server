@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
 import { AdminUsersService } from '../admin-users/admin-users.service';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 
 const AUTH_INVALID = 'Invalid credentials';
 
@@ -16,7 +16,7 @@ export interface JwtPayload {
 interface RefreshRow {
   id: string;
   user_id: string;
-  expires_at: string;
+  expires_at: string | Date;
 }
 
 @Injectable()
@@ -25,7 +25,7 @@ export class AuthService {
     private readonly adminUsers: AdminUsersService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly supabase: SupabaseService,
+    private readonly db: DatabaseService,
   ) {}
 
   private hashRefreshToken(token: string): string {
@@ -60,15 +60,13 @@ export class AuthService {
     await this.purgeExpiredRefreshTokens();
     const refreshToken = this.newRefreshTokenValue();
     const tokenHash = this.hashRefreshToken(refreshToken);
-    const { error } = await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .insert({
-        user_id: user.id,
-        token_hash: tokenHash,
-        expires_at: this.refreshExpiresAt().toISOString(),
-      } as never);
-    if (error) {
+    try {
+      await this.db.query(
+        `INSERT INTO admin_refresh_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.id, tokenHash, this.refreshExpiresAt().toISOString()],
+      );
+    } catch {
       throw new UnauthorizedException(AUTH_INVALID);
     }
     const accessToken = await this.signAccess(user.id, user.email);
@@ -82,23 +80,25 @@ export class AuthService {
 
   async refresh(refreshToken: string) {
     const tokenHash = this.hashRefreshToken(refreshToken);
-    const { data: row, error: findErr } = await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .select('id, user_id, expires_at')
-      .eq('token_hash', tokenHash)
-      .maybeSingle();
-    if (findErr) {
+    let typed: RefreshRow | null;
+    try {
+      const { rows } = await this.db.query<RefreshRow>(
+        `SELECT id, user_id, expires_at
+         FROM admin_refresh_tokens
+         WHERE token_hash = $1
+         LIMIT 1`,
+        [tokenHash],
+      );
+      typed = rows[0] ?? null;
+    } catch {
       throw new UnauthorizedException(AUTH_INVALID);
     }
-    const typed = row as RefreshRow | null;
     if (!typed || new Date(typed.expires_at) < new Date()) {
       if (typed) {
-        await this.supabase
-          .getClient()
-          .from('admin_refresh_tokens')
-          .delete()
-          .eq('id', typed.id);
+        await this.db.query(
+          `DELETE FROM admin_refresh_tokens WHERE id = $1`,
+          [typed.id],
+        );
       }
       throw new UnauthorizedException(AUTH_INVALID);
     }
@@ -106,22 +106,18 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException(AUTH_INVALID);
     }
-    await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .delete()
-      .eq('id', typed.id);
+    await this.db.query(`DELETE FROM admin_refresh_tokens WHERE id = $1`, [
+      typed.id,
+    ]);
     const newRt = this.newRefreshTokenValue();
     const newHash = this.hashRefreshToken(newRt);
-    const { error: insErr } = await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .insert({
-        user_id: user.id,
-        token_hash: newHash,
-        expires_at: this.refreshExpiresAt().toISOString(),
-      } as never);
-    if (insErr) {
+    try {
+      await this.db.query(
+        `INSERT INTO admin_refresh_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.id, newHash, this.refreshExpiresAt().toISOString()],
+      );
+    } catch {
       throw new UnauthorizedException(AUTH_INVALID);
     }
     const accessToken = await this.signAccess(user.id, user.email);
@@ -135,11 +131,10 @@ export class AuthService {
 
   async logout(refreshToken: string): Promise<{ ok: true }> {
     const tokenHash = this.hashRefreshToken(refreshToken);
-    await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .delete()
-      .eq('token_hash', tokenHash);
+    await this.db.query(
+      `DELETE FROM admin_refresh_tokens WHERE token_hash = $1`,
+      [tokenHash],
+    );
     return { ok: true };
   }
 
@@ -178,10 +173,9 @@ export class AuthService {
   }
 
   private async purgeExpiredRefreshTokens(): Promise<void> {
-    await this.supabase
-      .getClient()
-      .from('admin_refresh_tokens')
-      .delete()
-      .lt('expires_at', new Date().toISOString());
+    await this.db.query(
+      `DELETE FROM admin_refresh_tokens WHERE expires_at < $1`,
+      [new Date().toISOString()],
+    );
   }
 }

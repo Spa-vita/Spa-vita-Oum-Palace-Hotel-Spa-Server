@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { AdminUser } from './admin-user.types';
 
 const BCRYPT_ROUNDS = 12;
@@ -9,7 +9,7 @@ interface AdminUserRow {
   id: string;
   email: string;
   password_hash: string;
-  created_at: string;
+  created_at: string | Date;
 }
 
 function mapRow(row: AdminUserRow): AdminUser {
@@ -23,67 +23,59 @@ function mapRow(row: AdminUserRow): AdminUser {
 
 @Injectable()
 export class AdminUsersService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   async count(): Promise<number> {
-    const { count, error } = await this.supabase
-      .getClient()
-      .from('admin_users')
-      .select('*', { count: 'exact', head: true });
-    if (error) {
-      throw new Error(error.message);
-    }
-    return count ?? 0;
+    const { rows } = await this.db.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM admin_users',
+    );
+    return Number(rows[0]?.count ?? 0);
   }
 
   async findByEmail(email: string): Promise<AdminUser | null> {
     const normalized = email.trim().toLowerCase();
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('admin_users')
-      .select('id, email, password_hash, created_at')
-      .eq('email', normalized)
-      .maybeSingle();
-    if (error) {
-      throw new Error(error.message);
-    }
+    const { rows } = await this.db.query<AdminUserRow>(
+      `SELECT id, email, password_hash, created_at
+       FROM admin_users
+       WHERE email = $1
+       LIMIT 1`,
+      [normalized],
+    );
+    const data = rows[0] ?? null;
     if (!data) {
       return null;
     }
-    return mapRow(data as AdminUserRow);
+    return mapRow(data);
   }
 
   async findById(id: string): Promise<AdminUser | null> {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('admin_users')
-      .select('id, email, password_hash, created_at')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) {
-      throw new Error(error.message);
-    }
+    const { rows } = await this.db.query<AdminUserRow>(
+      `SELECT id, email, password_hash, created_at
+       FROM admin_users
+       WHERE id = $1
+       LIMIT 1`,
+      [id],
+    );
+    const data = rows[0] ?? null;
     if (!data) {
       return null;
     }
-    return mapRow(data as AdminUserRow);
+    return mapRow(data);
   }
 
   async create(email: string, plainPassword: string): Promise<AdminUser> {
     const passwordHash = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('admin_users')
-      .insert({
-        email: email.trim().toLowerCase(),
-        password_hash: passwordHash,
-      } as never)
-      .select('id, email, password_hash, created_at')
-      .single();
-    if (error) {
-      throw new Error(error.message);
+    const { rows } = await this.db.query<AdminUserRow>(
+      `INSERT INTO admin_users (email, password_hash)
+       VALUES ($1, $2)
+       RETURNING id, email, password_hash, created_at`,
+      [email.trim().toLowerCase(), passwordHash],
+    );
+    const data = rows[0];
+    if (!data) {
+      throw new Error('Failed to create admin user');
     }
-    return mapRow(data as AdminUserRow);
+    return mapRow(data);
   }
 
   async validatePassword(

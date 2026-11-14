@@ -17,7 +17,7 @@ export function configureApp(app: INestApplication): void {
       );
       if (req.originalUrl.startsWith('/api/')) {
         console.warn(
-          `[HTTP] ⚠ Route /api/* introuvable sur Nest. Utiliser /reservations (sans /api).`,
+          `[HTTP] ⚠ Route /api/* introuvable sur Nest. Utiliser /reservations ou /admin/rooms (sans /api).`,
         );
       }
     });

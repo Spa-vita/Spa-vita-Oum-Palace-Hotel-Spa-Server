@@ -8,7 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { PaymentModule } from './payment/payment.module';
 import { ReservationsModule } from './reservations/reservations.module';
-import { SupabaseModule } from './supabase/supabase.module';
+import { RoomsModule } from './rooms/rooms.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { SupabaseModule } from './supabase/supabase.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
-    SupabaseModule,
+    DatabaseModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -32,6 +33,7 @@ import { SupabaseModule } from './supabase/supabase.module';
     HealthModule,
     PaymentModule,
     ReservationsModule,
+    RoomsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

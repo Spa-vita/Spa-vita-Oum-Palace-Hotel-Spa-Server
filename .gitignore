@@ -29,6 +29,9 @@ coverage/
 # Misc
 *.tsbuildinfo
 
+# Uploads locaux (fallback sans Cloudinary)
+uploads/
+
 # SQLite local
 /data/
 *.db

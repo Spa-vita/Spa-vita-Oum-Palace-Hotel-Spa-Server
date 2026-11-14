@@ -161,29 +161,6 @@ class IsValidRoomOccupancyConstraint implements ValidatorConstraintInterface {
   }
 }
 
-@ValidatorConstraint({ name: 'isValidRoomNightlyRate', async: false })
-class IsValidRoomNightlyRateConstraint implements ValidatorConstraintInterface {
-  validate(price: unknown, args?: ValidationArguments): boolean {
-    const summary = args?.object as ReservationSummaryDto | undefined;
-    if (!summary?.roomId || typeof price !== 'number') return false;
-    const expected =
-      ROOM_NIGHTLY_RATES_BB_MAD[
-        summary.roomId as (typeof ALLOWED_ROOM_IDS)[number]
-      ];
-    return expected !== undefined && price === expected;
-  }
-
-  defaultMessage(args?: ValidationArguments) {
-    const summary = args?.object as ReservationSummaryDto | undefined;
-    const roomId = summary?.roomId ?? 'unknown';
-    const expected =
-      ROOM_NIGHTLY_RATES_BB_MAD[
-        roomId as (typeof ALLOWED_ROOM_IDS)[number]
-      ];
-    return `Invalid roomPriceFromMAD for "${roomId}": expected BB rate ${String(expected ?? '?')} MAD`;
-  }
-}
-
 class ReservationRoomDto {
   @IsInt()
   @Min(1)
@@ -230,9 +207,9 @@ class ReservationSummaryDto {
   @IsString()
   roomImage?: string;
 
+  /** Validé côté service contre le tarif CMS (`rooms.price_amount`). */
   @IsInt()
   @Min(0)
-  @Validate(IsValidRoomNightlyRateConstraint)
   roomPriceFromMAD!: number;
 
   @IsArray()

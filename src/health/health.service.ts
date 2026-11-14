@@ -1,22 +1,42 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
-
-
+import { DatabaseService } from '../database/database.service';
 
 @Injectable()
 export class HealthService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   async getHealth() {
-    const supabase = await this.supabase.getConnectionStatus();
-    return {
-      status: supabase.connected ? 'ok' : 'degraded',
-      supabase: {
-        connected: supabase.connected,
-        message: supabase.message,
-        adminUsersTable: supabase.adminUsersTable,
-      },
-      checkedAt: new Date().toISOString(),
-    };
+    try {
+      await this.db.query('SELECT 1');
+      let adminUsersTable: 'ok' | 'unavailable' = 'ok';
+      let message =
+        'Database reachable, table admin_users OK';
+      try {
+        await this.db.query('SELECT id FROM admin_users LIMIT 1');
+      } catch {
+        adminUsersTable = 'unavailable';
+        message =
+          'Database reachable — table admin_users missing or inaccessible (sql/supabase-admin-tables.sql)';
+      }
+      return {
+        status: 'ok' as const,
+        supabase: {
+          connected: true,
+          message,
+          adminUsersTable,
+        },
+        checkedAt: new Date().toISOString(),
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return {
+        status: 'degraded' as const,
+        supabase: {
+          connected: false,
+          message,
+        },
+        checkedAt: new Date().toISOString(),
+      };
+    }
   }
 }

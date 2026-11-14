@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import {
   generateCmiHash,
   redactCmiParamsForLog,
@@ -24,7 +24,7 @@ export class PaymentService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly supabase: SupabaseService,
+    private readonly db: DatabaseService,
   ) {}
 
   initiate(dto: InitiatePaymentDto): CmiInitiateResponse {
@@ -188,35 +188,35 @@ export class PaymentService {
   }
 
   private async markReservationPaid(orderId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    const byId = await client
-      .from('reservations')
-      .update({ status: 'paid' } as never)
-      .eq('id', orderId)
-      .select('id')
-      .maybeSingle();
-
-    if (!byId.error && byId.data) {
-      return;
-    }
-
-    const byRef = await client
-      .from('reservations')
-      .update({ status: 'paid' } as never)
-      .eq('reference', orderId)
-      .select('id')
-      .maybeSingle();
-
-    if (byRef.error) {
-      this.logger.error(
-        `markReservationPaid() — Supabase error: ${byRef.error.message}`,
+    try {
+      const byId = await this.db.query<{ id: string }>(
+        `UPDATE reservations
+         SET status = $1
+         WHERE id = $2
+         RETURNING id`,
+        ['paid', orderId],
       );
-      throw new InternalServerErrorException(byRef.error.message);
-    }
+      if (byId.rows[0]) {
+        return;
+      }
 
-    if (!byRef.data) {
-      this.logger.warn(`markReservationPaid() — reservation not found oid=${orderId}`);
+      const byRef = await this.db.query<{ id: string }>(
+        `UPDATE reservations
+         SET status = $1
+         WHERE reference = $2
+         RETURNING id`,
+        ['paid', orderId],
+      );
+
+      if (!byRef.rows[0]) {
+        this.logger.warn(
+          `markReservationPaid() — reservation not found oid=${orderId}`,
+        );
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.logger.error(`markReservationPaid() — database error: ${message}`);
+      throw new InternalServerErrorException(message);
     }
   }
 }
