@@ -10,6 +10,8 @@ import { PaymentModule } from './payment/payment.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { DatabaseModule } from './database/database.module';
+import { RoomUnitsModule } from './room-units/room-units.module';
+import { AvailabilityBlocksModule } from './availability-blocks/availability-blocks.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { DatabaseModule } from './database/database.module';
     PaymentModule,
     ReservationsModule,
     RoomsModule,
+    RoomUnitsModule,
+    AvailabilityBlocksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
