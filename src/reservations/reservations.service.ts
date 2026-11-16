@@ -7,12 +7,14 @@ import {
 } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { DatabaseService } from '../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RoomsService } from '../rooms/rooms.service';
 import {
   ALLOWED_EXTRAS_IDS,
   CreateReservationDto,
   ROOM_NIGHTLY_RATES_BB_MAD,
 } from './dto/create-reservation.dto';
+
 
 type ReservationStatus = 'pending' | 'paid' | 'confirmed' | 'cancelled';
 type ReservationType = 'rooms' | 'spa' | 'restaurant';
@@ -93,7 +95,9 @@ export class ReservationsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly rooms: RoomsService,
+    private readonly notifications: NotificationsService,
   ) {}
+
 
   /**
    * Tarif nuitée = CMS `rooms.price_amount` (fallback seed hardcodé si table absente).
@@ -190,6 +194,20 @@ export class ReservationsService {
         }
         const row = mapRow(data);
         this.logger.log(`create() OK — id=${row.id} ref=${row.reference}`);
+        try {
+          const guestName =
+            `${dto.guest.firstName} ${dto.guest.lastName}`.trim();
+          await this.notifications.createBookingNotification({
+            guestName,
+            reference: row.reference,
+          });
+        } catch (notifyErr) {
+          const msg =
+            notifyErr instanceof Error ? notifyErr.message : String(notifyErr);
+          this.logger.warn(
+            `create() — notification insert failed (reservation kept): ${msg}`,
+          );
+        }
         return row;
       } catch (e) {
         if (e instanceof InternalServerErrorException) throw e;

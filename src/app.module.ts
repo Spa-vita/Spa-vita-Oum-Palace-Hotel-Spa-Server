@@ -12,6 +12,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { DatabaseModule } from './database/database.module';
 import { RoomUnitsModule } from './room-units/room-units.module';
 import { AvailabilityBlocksModule } from './availability-blocks/availability-blocks.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AvailabilityBlocksModule } from './availability-blocks/availability-blo
     RoomsModule,
     RoomUnitsModule,
     AvailabilityBlocksModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
