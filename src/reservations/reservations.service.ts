@@ -10,10 +10,15 @@ import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RoomsService } from '../rooms/rooms.service';
 import {
+  extractReservationTotal,
+  TransactionsService,
+} from '../transactions/transactions.service';
+import {
   ALLOWED_EXTRAS_IDS,
   CreateReservationDto,
   ROOM_NIGHTLY_RATES_BB_MAD,
 } from './dto/create-reservation.dto';
+
 
 
 type ReservationStatus = 'pending' | 'paid' | 'confirmed' | 'cancelled';
@@ -96,7 +101,9 @@ export class ReservationsService {
     private readonly db: DatabaseService,
     private readonly rooms: RoomsService,
     private readonly notifications: NotificationsService,
+    private readonly transactions: TransactionsService,
   ) {}
+
 
 
   /**
@@ -288,6 +295,29 @@ export class ReservationsService {
     }
     const row = mapRow(data);
     this.logger.log(`updateStatus() OK — ref=${row.reference} status=${row.status}`);
+
+    if (status === 'paid') {
+      try {
+        const amount = extractReservationTotal(row.summary);
+        if (amount === null) {
+          this.logger.warn(
+            `updateStatus() — no estimatedTotalMAD for reservation ${row.id}`,
+          );
+        } else {
+          await this.transactions.recordPayment({
+            reservationId: row.id,
+            amount,
+            method: 'manual',
+          });
+        }
+      } catch (txErr) {
+        const msg = txErr instanceof Error ? txErr.message : String(txErr);
+        this.logger.warn(
+          `updateStatus() — transaction insert failed (status kept): ${msg}`,
+        );
+      }
+    }
+
     return row;
   }
 }

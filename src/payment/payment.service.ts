@@ -7,11 +7,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service';
 import {
+  extractReservationTotal,
+  TransactionsService,
+} from '../transactions/transactions.service';
+import {
   generateCmiHash,
   redactCmiParamsForLog,
   toStringParams,
 } from './cmi-hash.util';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+
 
 export interface CmiInitiateResponse {
   paymentUrl: string;
@@ -25,7 +30,9 @@ export class PaymentService {
   constructor(
     private readonly config: ConfigService,
     private readonly db: DatabaseService,
+    private readonly transactions: TransactionsService,
   ) {}
+
 
   initiate(dto: InitiatePaymentDto): CmiInitiateResponse {
     const storeKey = this.requireStoreKey();
@@ -98,12 +105,18 @@ export class PaymentService {
     }
 
     if (oid) {
-      await this.markReservationPaid(oid);
+      const amountRaw = params.amount ?? params.Amount;
+      const cmiAmount = amountRaw ? Number(amountRaw) : NaN;
+      await this.markReservationPaid(
+        oid,
+        Number.isFinite(cmiAmount) ? cmiAmount : null,
+      );
     }
 
     this.logger.log(`callback() OK — oid=${oid} status=paid`);
     return 'ACTION=POSTAUTH';
   }
+
 
   /** Validates CMI signature on browser return (success). */
   assertValidSuccessReturn(
@@ -187,30 +200,59 @@ export class PaymentService {
     return this.config.get<string>(envKey)?.trim() || fallback;
   }
 
-  private async markReservationPaid(orderId: string): Promise<void> {
+  private async markReservationPaid(
+    orderId: string,
+    cmiAmount: number | null,
+  ): Promise<void> {
     try {
-      const byId = await this.db.query<{ id: string }>(
+      type PaidRow = { id: string; summary: unknown };
+      let row: PaidRow | null = null;
+
+      const byId = await this.db.query<PaidRow>(
         `UPDATE reservations
          SET status = $1
          WHERE id = $2
-         RETURNING id`,
+         RETURNING id, summary`,
         ['paid', orderId],
       );
-      if (byId.rows[0]) {
+      row = byId.rows[0] ?? null;
+
+      if (!row) {
+        const byRef = await this.db.query<PaidRow>(
+          `UPDATE reservations
+           SET status = $1
+           WHERE reference = $2
+           RETURNING id, summary`,
+          ['paid', orderId],
+        );
+        row = byRef.rows[0] ?? null;
+      }
+
+      if (!row) {
+        this.logger.warn(
+          `markReservationPaid() — reservation not found oid=${orderId}`,
+        );
         return;
       }
 
-      const byRef = await this.db.query<{ id: string }>(
-        `UPDATE reservations
-         SET status = $1
-         WHERE reference = $2
-         RETURNING id`,
-        ['paid', orderId],
-      );
-
-      if (!byRef.rows[0]) {
+      try {
+        const fallback = extractReservationTotal(row.summary);
+        const amount = cmiAmount ?? fallback;
+        if (amount === null) {
+          this.logger.warn(
+            `markReservationPaid() — no amount for reservation ${row.id}`,
+          );
+          return;
+        }
+        await this.transactions.recordPayment({
+          reservationId: row.id,
+          amount,
+          method: 'cmi',
+        });
+      } catch (txErr) {
+        const msg = txErr instanceof Error ? txErr.message : String(txErr);
         this.logger.warn(
-          `markReservationPaid() — reservation not found oid=${orderId}`,
+          `markReservationPaid() — transaction insert failed (payment kept): ${msg}`,
         );
       }
     } catch (e) {
@@ -220,3 +262,4 @@ export class PaymentService {
     }
   }
 }
+
