@@ -207,6 +207,7 @@ export class ReservationsService {
           await this.notifications.createBookingNotification({
             guestName,
             reference: row.reference,
+            reservationId: row.id,
           });
         } catch (notifyErr) {
           const msg =

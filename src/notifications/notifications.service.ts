@@ -14,6 +14,7 @@ export interface Notification {
   title: string;
   body: string | null;
   read: boolean;
+  reservation_id: string | null;
   createdAt: string;
 }
 
@@ -23,10 +24,11 @@ interface NotificationRow {
   title: string;
   body: string | null;
   read: boolean;
+  reservation_id: string | null;
   created_at: string | Date;
 }
 
-const SELECT_COLS = 'id, type, title, body, read, created_at';
+const SELECT_COLS = 'id, type, title, body, read, reservation_id, created_at';
 
 function toIso(value: string | Date): string {
   return typeof value === 'string' ? value : value.toISOString();
@@ -39,6 +41,7 @@ function mapRow(row: NotificationRow): Notification {
     title: row.title,
     body: row.body,
     read: row.read,
+    reservation_id: row.reservation_id ?? null,
     createdAt: toIso(row.created_at),
   };
 }
@@ -118,14 +121,15 @@ export class NotificationsService {
   async createBookingNotification(params: {
     guestName: string;
     reference: string;
+    reservationId: string;
   }): Promise<Notification> {
     const guestName = params.guestName.trim() || 'Invité';
     const body = `${guestName} · ${params.reference}`;
     const { rows } = await this.db.query<NotificationRow>(
-      `INSERT INTO notifications (type, title, body)
-       VALUES ($1, $2, $3)
+      `INSERT INTO notifications (type, title, body, reservation_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING ${SELECT_COLS}`,
-      ['booking', 'Nouvelle réservation', body],
+      ['booking', 'Nouvelle réservation', body, params.reservationId],
     );
     const data = rows[0];
     if (!data) {
